@@ -1,0 +1,21 @@
+[project]
+name = "iva"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "dotenv>=0.9.9",
+    "gtts>=2.5.4",
+    "ipykernel>=7.1.0",
+    "numpy>=2.3.5",
+    "openai-whisper>=20250625",
+    "pydub>=0.25.1",
+    "python-dotenv>=1.2.1",
+    "realtimestt>=0.3.104",
+    "requests>=2.32.5",
+    "sounddevice>=0.5.3",
+    "torch>=2.9.1",
+    "vosk>=0.3.45",
+    "whisper>=1.1.10",
+]
