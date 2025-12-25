@@ -16,7 +16,7 @@ def large_language_model(messages):
         json={
             "model": "xiaomi/mimo-v2-flash:free",
             "messages": messages,
-            "max_tokens": 20,
+            "max_tokens": 512,
             "temperature": 0.5,
         },
         timeout=30,
