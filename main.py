@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-MODEL_PATH = r"D:\Projects\iva\vosk-model-small-en-us-0.15"
+MODEL_PATH = os.path.join("vosk-model-small-en-us-0.15")
 SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT")
 
 chat_history = [{"role": "system", "content": SYSTEM_PROMPT}]
