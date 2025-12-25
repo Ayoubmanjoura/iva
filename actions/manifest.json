@@ -1,0 +1,8 @@
+{
+  "open_file_explorer": {
+    "description": "Open a file explorer in the browser",
+    "args": {
+      "path": "string"
+    }
+  }
+}
