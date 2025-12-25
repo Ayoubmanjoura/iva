@@ -2,12 +2,12 @@ import requests
 import os
 from dotenv import load_dotenv
 
+load_dotenv()
 
-def large_language_model(input):
-    load_dotenv()
+API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-    API_KEY = os.getenv("OPENROUTER_API_KEY")
 
+def large_language_model(messages):
     response = requests.post(
         "https://openrouter.ai/api/v1/chat/completions",
         headers={
@@ -15,11 +15,12 @@ def large_language_model(input):
         },
         json={
             "model": "xiaomi/mimo-v2-flash:free",
-            "messages": [{"role": "user", "content": input}],
+            "messages": messages,
+            "max_tokens": 20,
+            "temperature": 0.5,
         },
+        timeout=30,
     )
 
-    raw_output = response.json()
-    output = raw_output["choices"][0]["message"]["content"]
-
-    return output
+    data = response.json()
+    return data["choices"][0]["message"]["content"]
