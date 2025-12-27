@@ -4,5 +4,11 @@
     "args": {
       "path": "string"
     }
+  },
+  "terminal": {
+    "description": "Run a powershell command in the terminal",
+    "args":{
+      "command": "string"
+    }
   }
 }
