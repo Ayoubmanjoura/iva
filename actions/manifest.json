@@ -1,14 +1,8 @@
 {
-  "open_file_explorer": {
-    "description": "Open a file explorer in the browser",
+  "<action_name>": {
+    "description": "What this action does, in one sentence",
     "args": {
-      "path": "string"
-    }
-  },
-  "terminal": {
-    "description": "Run a powershell command in the terminal",
-    "args":{
-      "command": "string"
+      "<arg_name>": "string"
     }
   }
 }
