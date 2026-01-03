@@ -12,7 +12,7 @@ from audio import play_mp3_bytes
 # =========================
 MODEL_PATH = os.path.join("vosk-model-small-en-us-0.15")
 SYSTEM_PROMPT_FILE = "system_prompt.txt"
-MANIFEST_FILE = "manifest.json"
+MANIFEST_FILE = "actions/manifest.json"
 
 # =========================
 # Load system prompt
