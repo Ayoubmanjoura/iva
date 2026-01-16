@@ -62,8 +62,6 @@ def _filter_index(index, artist=None, album=None):
 def run(args):
     """
     Play audio files from the first detected USB drive.
-    Uses the index if it exists for blazing fast search.
-
     Optional args:
       - artist: str
       - album: str
@@ -80,18 +78,16 @@ def run(args):
         if isinstance(val, str) and any(x in val.lower() for x in forbidden):
             raise PermissionError("Nice try.")
 
-    # 1️⃣ Try to load index first
+    # Try to load index first
     index = _load_index()
     song_list = []
 
     if index:
-        # Filter indexed songs
         filtered = _filter_index(index, artist=artist, album=album)
-        # Sort by track number
         song_list = sorted(filtered, key=lambda x: x.get("track", 0))
         song_list = [item["path"] for item in song_list]
 
-    # 2️⃣ Fallback: scan USB if no index or no matches
+    # Fallback: scan USB if no index or no matches
     if not song_list:
         usb_drives = _detect_usb_drives()
         if not usb_drives:
@@ -135,7 +131,12 @@ def run(args):
 
         song_list.sort(key=_track_number)
 
-    # Play the full playlist
-    manager.play_playlist(song_list)
+    vlc_instance = vlc.Instance()
+    player = vlc_instance.media_list_player_new()
+    media_list = vlc_instance.media_list_new()
+    for path in song_list:
+        media_list.add_media(vlc_instance.media_new(str(path)))
+    player.set_media_list(media_list)
+    player.play()
 
     return f"Played {len(song_list)} song(s) from USB."
