@@ -1,7 +1,7 @@
+[project]
 name = "iva"
 version = "0.2.0"
 description = "intelligent virtual assistant"
-readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "beautifulsoup4>=4.14.3",
