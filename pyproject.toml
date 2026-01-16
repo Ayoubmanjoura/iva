@@ -4,6 +4,12 @@ version = "0.2.0"
 description = "intelligent virtual assistant"
 readme = "README.md"
 requires-python = ">=3.13"
+[project]
+name = "iva"
+version = "0.2.0"
+description = "intelligent virtual assistant"
+readme = "README.md"
+requires-python = ">=3.13"
 dependencies = [
     "beautifulsoup4>=4.14.3",
     "bleak>=2.1.1",
@@ -30,3 +36,4 @@ dependencies = [
     "torch>=2.9.1",
     "vosk>=0.3.45",
 ]
+
