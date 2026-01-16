@@ -1,135 +1,144 @@
-import os
-import json
+import threading
 import re
-import subprocess
+import json
+import os
 import llm
 import stt
 import tts
 from audio import play_mp3_bytes
+import audio_manager
+from automations.alarm import start_scheduler
 
 # =========================
-# Paths
+# Paths & files
 # =========================
-MODEL_PATH = os.path.join("vosk-model-small-en-us-0.15")
+MODEL_PATH = "vosk-model-small-en-us-0.15"
 SYSTEM_PROMPT_FILE = "system_prompt.txt"
 MANIFEST_FILE = "actions/manifest.json"
 
-# =========================
-# Load system prompt
-# =========================
 with open(SYSTEM_PROMPT_FILE, "r", encoding="utf-8") as f:
     SYSTEM_PROMPT = f.read().strip()
 
-# =========================
-# Load manifest
-# =========================
 with open(MANIFEST_FILE, "r", encoding="utf-8") as f:
     MANIFEST = json.load(f)
 
-# =========================
-# Chat history
-# =========================
 chat_history = [{"role": "system", "content": SYSTEM_PROMPT}]
+manager = audio_manager.AudioManager()
 
 
 # =========================
-# Action dispatcher
+# Action executor (fixed)
 # =========================
 def handle_action(tool_json):
     action_name = tool_json.get("action")
     args = tool_json.get("args", {})
 
-    # Validate action
     if action_name not in MANIFEST:
         return f"Action '{action_name}' is not allowed."
 
-    # Validate args
     expected_args = MANIFEST[action_name].get("args", {})
-    for key in expected_args:
-        if key not in args:
+    for key, meta in expected_args.items():
+        # FIXED: check for key existence instead of truthiness
+        if meta.get("required", True) and key not in args:
             return f"Missing argument '{key}' for action '{action_name}'."
 
     try:
-        # Dynamically import action module
         module = __import__(f"actions.{action_name}", fromlist=["run"])
-        result = module.run(args)
-        return result if result else "Action completed."
-
+        return module.run(args) or "Action completed."
     except Exception as e:
         return f"Action error: {e}"
 
 
 # =========================
-# Input (STT placeholder)
+# Input
 # =========================
 def get_user_input():
-    return input("You: ").strip()
+    # Replace with STT if needed
+    try:
+        return stt.speech_to_text(MODEL_PATH) or ""
+    except Exception as e:
+        print(f"STT error: {e}")
+        return input("You: ").strip()
 
 
 # =========================
-# Output processing
+# Output processing (fixed)
 # =========================
 def process_output(output):
     message = output.get("message", "")
 
     tool_json = None
 
-    # Try extracting JSON tool call
-    json_match = re.search(r"\{.*\}", message, re.DOTALL)
-    if json_match:
+    # if LLM explicitly says type=command, just use command
+    if output.get("type") == "command":
+        tool_json = output.get("command")
+    else:
+        # TRY full JSON first
         try:
-            tool_json = json.loads(json_match.group())
+            tool_json = json.loads(message)
         except json.JSONDecodeError:
-            tool_json = None
+            # fallback: extract JSON from text
+            match = re.search(r"\{.*\}", message, re.DOTALL)
+            if match:
+                try:
+                    tool_json = json.loads(match.group())
+                except json.JSONDecodeError:
+                    tool_json = None
 
-    # Remove JSON from spoken text
+    # Remove JSON from message for clean speech output
     speak_text = re.sub(r"\{.*\}", "", message, flags=re.DOTALL).strip()
 
-    # Execute tool if present
     if tool_json:
-        speak_text = handle_action(tool_json)
+        speak_text = handle_action(tool_json) or speak_text
 
-    if not speak_text:
-        speak_text = "Done."
-
-    return speak_text
+    return speak_text or "Done."
 
 
 # =========================
-# Main loop
+# Main Loop
 # =========================
 def main_loop():
-    while True:
-        transcript = stt.speech_to_text(MODEL_PATH)
-        # transcript = get_user_input()
-        if not transcript:
-            continue
+    try:
+        while True:
+            # transcript = get_user_input()
+            transcript = input("You: ").strip()
+            if not transcript:
+                continue
 
-        if transcript.lower() in {"exit", "quit", "shutdown"}:
-            break
+            if transcript.lower() in {"exit", "quit", "shutdown"}:
+                print("Shutting down...")
+                break
 
-        print(f"You: {transcript}")
-        chat_history.append({"role": "user", "content": transcript})
+            print(f"You: {transcript}")
+            chat_history.append({"role": "user", "content": transcript})
 
-        output = llm.large_language_model(chat_history)
+            output = llm.large_language_model(chat_history) or {"message": ""}
+            speak_text = process_output(output)
+            print(f"iva: {speak_text}")
 
-        speak_text = process_output(output)
-        print(f"iva: {speak_text}")
+            chat_history.append(
+                {"role": "assistant", "content": output.get("message", "")}
+            )
 
-        # IMPORTANT: store RAW assistant output, not tool result
-        chat_history.append({"role": "assistant", "content": output.get("message", "")})
+            # TTS with ducking
+            try:
+                mp3_audio = tts.tts_gtts_bytes(speak_text)
+                manager.play_tts_with_duck(mp3_audio)
+            except Exception as e:
+                print(f"TTS error: {e}")
 
-        # Speak
-        mp3_audio = tts.tts_gtts_bytes(speak_text)
-        play_mp3_bytes(mp3_audio)
+            # Keep last 20 turns + system
+            if len(chat_history) > 21:
+                chat_history[:] = chat_history[:1] + chat_history[-20:]
 
-        # Keep last 20 turns (+ system)
-        if len(chat_history) > 21:
-            chat_history[:] = chat_history[:1] + chat_history[-20:]
+    except KeyboardInterrupt:
+        print("\nLoop stopped by user.")
 
 
 # =========================
 # Entry point
 # =========================
 if __name__ == "__main__":
+    scheduler_thread = threading.Thread(target=start_scheduler, daemon=True)
+    scheduler_thread.start()
     main_loop()

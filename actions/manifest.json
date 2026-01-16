@@ -1,8 +1,127 @@
 {
-  "<action_name>": {
-    "description": "What this action does, in one sentence",
+  "toggle_bulb": {
+    "description": "Turn a Wiz bulb ON or OFF.",
     "args": {
-      "<arg_name>": "string"
+      "turn_on": {
+        "type": "boolean",
+        "required": true
+      }
+    }
+  },
+  "change_color": {
+    "description": "Sets the color of the first discovered Wiz bulb using a HEX string.",
+    "args": {
+      "hex_color": {
+        "type": "string",
+        "required": true
+      }
+    }
+  },
+  "set_brightness": {
+    "description": "Sets the brightness of the first discovered Wiz bulb.",
+    "args": {
+      "brightness": {
+        "type": "int (0-255)",
+        "required": true
+      }
+    }
+  },
+  "temperature": {
+    "description": "Sets the color temperature of the first discovered Wiz bulb.",
+    "args": {
+      "temperature": {
+        "type": "int (2500-6500)",
+        "required": true
+      }
+    }
+  },
+  "scenes": {
+    "description": "Sets a scene on Wiz bulb.",
+    "args": {
+      "scene_number": {
+        "type": "int (0-32 or 1000 for Rhythm)",
+        "required": true
+      }
+    }
+  },
+  "play_music": {
+    "description": "Plays audio files, optionally filtered by artist or album.",
+    "args": {
+      "artist": {
+        "type": "string",
+        "required": false
+      },
+      "album": {
+        "type": "string",
+        "required": false
+      }
+    }
+  },
+  "stop_music": {
+    "description": "Stops the currently playing audio.",
+    "args": {}
+  },
+  "next_song": {
+    "description": "Skips to the next song in the current playlist.",
+    "args": {}
+  },
+  "toggle_music": {
+    "description": "Toggles between play and pause for the current music.",
+    "args": {}
+  },
+  "index_music": {
+    "description": "Indexes the music library to ensure all tracks are available for playback.",
+    "args": {}
+  },
+  "web_search": {
+    "description": "Search the web",
+    "args": {
+      "query": {
+        "type": "string",
+        "required": true
+      },
+      "n_results": {
+        "type": "integer",
+        "required": true
+      }
+    }
+  },
+  "weather": {
+    "description": "Checks for rain within the next 7 days and provides the average daily temperature. Uses high-precision coordinates for the specified city or auto-detects location via IP if the city is omitted.",
+    "args": {
+      "city": {
+        "type": "string",
+        "required": false
+      }
+    }
+  },
+  "create_automation": {
+  "description": "Creates a new automation script file safely. The AI provides the full Python script as a string. Existing files with the same name are backed up automatically.",
+  "args": {
+    "name": {
+      "type": "string",
+      "required": true,
+      "notes": "Filename must contain only letters, numbers, underscores, hyphens and end with .py"
+    },
+    "script": {
+      "type": "string",
+      "required": true,
+      "notes": "Full Python script as a string"
     }
   }
+  },
+"create_playlist": {
+  "description": "Creates a new music playlist based on a topic using the local music index.",
+  "args": {
+    "theme": {
+      "type": "string",
+      "required": true
+    }
+  }
+},
+"play_playlist": {
+  "description": "Plays the default local music playlist (playlist.json).",
+  "args": {}
+}
+
 }
