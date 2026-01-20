@@ -10,18 +10,19 @@ from vosk import Model, KaldiRecognizer
 def speech_to_text(model_path, samplerate=16000, silence_timeout=2.0):
     model = Model(model_path)
     recognizer = KaldiRecognizer(model, samplerate)
+    recognizer.SetWords(True)
 
-    vad = webrtcvad.Vad(2)  # 0–3 (higher = stricter)
+    vad = webrtcvad.Vad(3)  # be strict, noise is cringe
     q = queue.Queue()
-    final_text = ""
+    final_text = []
 
     frame_duration_ms = 30
     frame_size = int(samplerate * frame_duration_ms / 1000)
-    bytes_per_frame = frame_size * 2  # int16
+    bytes_per_frame = frame_size * 2  # int16 mono
 
     ring_buffer = collections.deque(maxlen=10)
     triggered = False
-    last_speech_time = time.time()
+    last_voice_time = time.time()
 
     def callback(indata, frames, time_info, status):
         if status:
@@ -39,15 +40,16 @@ def speech_to_text(model_path, samplerate=16000, silence_timeout=2.0):
 
         while True:
             data = q.get()
-            now = time.time()
 
-            if len(data) < bytes_per_frame:
+            # make VAD happy or it will lie to you
+            if len(data) != bytes_per_frame:
                 continue
 
+            now = time.time()
             is_speech = vad.is_speech(data, samplerate)
 
             if is_speech:
-                last_speech_time = now
+                last_voice_time = now
 
             if not triggered:
                 ring_buffer.append((data, is_speech))
@@ -71,11 +73,18 @@ def speech_to_text(model_path, samplerate=16000, silence_timeout=2.0):
                     result = json.loads(recognizer.Result())
                     text = result.get("text", "").strip()
                     if text:
-                        final_text += text + " "
+                        final_text.append(text)
                         print("FINAL:", text)
 
-            if now - last_speech_time > silence_timeout:
-                print("Silence detected. Done.")
+            # only stop if user is ACTUALLY done speaking
+            if not triggered and now - last_voice_time > silence_timeout:
                 break
 
-    return final_text.strip()
+        # don’t throw away the last sentence like a clown
+        final = json.loads(recognizer.FinalResult())
+        text = final.get("text", "").strip()
+        if text:
+            final_text.append(text)
+            print("FINAL:", text)
+
+    return " ".join(final_text)

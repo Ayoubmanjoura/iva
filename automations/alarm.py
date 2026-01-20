@@ -2,6 +2,7 @@ import schedule
 import time
 import asyncio
 import sys
+import datetime
 from pywizlight import PilotBuilder, discovery
 
 # =========================
@@ -15,6 +16,7 @@ SCENE_NUMBER = 31  # Pulse
 
 bulbs = []
 loop = None
+weekend_early_done = False  # flag for skipping 7AM if 5AM ran
 
 
 # =========================
@@ -32,7 +34,22 @@ async def activate_scene_all(scene_number):
 # =========================
 # Automation functions
 # =========================
+def weekend_early_automation():
+    global weekend_early_done
+    if datetime.datetime.today().weekday() in (5, 6):  # Saturday or Sunday
+        print("[AUTO] 05:00 weekend automation fired")
+        loop.call_soon_threadsafe(asyncio.create_task, activate_scene_all(SCENE_NUMBER))
+        weekend_early_done = True
+    else:
+        weekend_early_done = False
+        print("[AUTO] Not weekend, skipping 05:00 automation")
+
+
 def morning_automation():
+    global weekend_early_done
+    if weekend_early_done:
+        weekend_early_done = False  # reset flag for next day
+        return
     print("[AUTO] 07:30 automation fired")
     loop.call_soon_threadsafe(asyncio.create_task, activate_scene_all(SCENE_NUMBER))
 
@@ -61,7 +78,9 @@ def start_scheduler():
 
     print(f"[AUTO] ✅ Found {len(bulbs)} bulb(s). Ready.")
 
-    schedule.every().day.at("09:00").do(morning_automation)
+    # Scheduling
+    schedule.every().day.at("05:00").do(weekend_early_automation)
+    schedule.every().day.at("07:30").do(morning_automation)
     schedule.every().day.at("19:30").do(evening_automation)
 
     try:

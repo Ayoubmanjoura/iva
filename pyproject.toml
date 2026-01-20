@@ -26,6 +26,7 @@ dependencies = [
     "scrapy>=2.14.1",
     "selenium>=4.39.0",
     "sounddevice>=0.5.3",
+    "speechrecognition>=3.14.5",
     "torch>=2.9.1",
     "vosk>=0.3.45",
 ]

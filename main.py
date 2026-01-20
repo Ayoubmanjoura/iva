@@ -12,7 +12,7 @@ from automations.alarm import start_scheduler
 # =========================
 # Paths & files
 # =========================
-MODEL_PATH = "vosk-model-small-en-us-0.15"
+MODEL_PATH = "vosk-model-en-us-0.22"
 SYSTEM_PROMPT_FILE = "system_prompt.txt"
 MANIFEST_FILE = "actions/manifest.json"
 
@@ -100,8 +100,8 @@ def process_output(output):
 def main_loop():
     try:
         while True:
-            # transcript = get_user_input()
-            transcript = input("You: ").strip()
+            transcript = get_user_input()
+            # transcript = input("You: ").strip()
             if not transcript:
                 continue
 
