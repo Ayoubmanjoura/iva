@@ -32,8 +32,12 @@ _TYPE_VALIDATORS = {
 def _is_valid_command(obj: dict) -> bool:
     if not isinstance(obj, dict):
         return False
-    if "action" not in obj or "args" not in obj:
+    if "action" not in obj:
         return False
+
+    # Default missing args to {} — model sometimes omits it for arg-less actions
+    if "args" not in obj:
+        obj["args"] = {}
 
     action = obj["action"]
     args = obj["args"]
@@ -86,7 +90,6 @@ def large_language_model(messages: list) -> dict:
         return {"type": "chat", "message": "Unexpected response from the model."}
 
     content: str = data["choices"][0]["message"]["content"]
-    print(f"[DEBUG] raw content: {repr(content)}")
 
     # Extract JSON even if the model wrapped it in text e.g. "Sure! {"action": ...}"
     json_match = re.search(r"\{.*\}", content, re.DOTALL)
