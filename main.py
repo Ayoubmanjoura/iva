@@ -1,7 +1,6 @@
 import os
 import json
 import re
-import subprocess
 import llm
 import stt
 import tts
@@ -10,101 +9,82 @@ from audio import play_mp3_bytes
 # =========================
 # Paths
 # =========================
-MODEL_PATH = os.path.join("vosk-model-small-en-us-0.15")
+MODEL_PATH = "vosk-model-small-en-us-0.15"
 SYSTEM_PROMPT_FILE = "system_prompt.txt"
 MANIFEST_FILE = "actions/manifest.json"
 
 # =========================
-# Load system prompt
+# Load system prompt & manifest ONCE
 # =========================
 with open(SYSTEM_PROMPT_FILE, "r", encoding="utf-8") as f:
     SYSTEM_PROMPT = f.read().strip()
 
-# =========================
-# Load manifest
-# =========================
 with open(MANIFEST_FILE, "r", encoding="utf-8") as f:
     MANIFEST = json.load(f)
 
-# =========================
-# Chat history
-# =========================
-chat_history = [{"role": "system", "content": SYSTEM_PROMPT}]
-
+# Pass manifest into llm module so it doesn't reload it
+llm.set_manifest(MANIFEST)
 
 # =========================
-# Action dispatcher
+# Action module cache
 # =========================
-def handle_action(tool_json):
+_action_module_cache: dict = {}
+
+def handle_action(tool_json: dict) -> str:
     action_name = tool_json.get("action")
     args = tool_json.get("args", {})
 
-    # Validate action
     if action_name not in MANIFEST:
         return f"Action '{action_name}' is not allowed."
 
-    # Validate args
     expected_args = MANIFEST[action_name].get("args", {})
-    for key in expected_args:
-        if key not in args:
-            return f"Missing argument '{key}' for action '{action_name}'."
+    for key, arg_info in expected_args.items():
+        required = arg_info.get("required", True) if isinstance(arg_info, dict) else True
+        if required and key not in args:
+            return f"I'm missing some information to do that. Could you be more specific?"
 
     try:
-        # Dynamically import action module
-        module = __import__(f"actions.{action_name}", fromlist=["run"])
+        # Cache imported modules — avoids repeated __import__ overhead
+        if action_name not in _action_module_cache:
+            _action_module_cache[action_name] = __import__(
+                f"actions.{action_name}", fromlist=["run"]
+            )
+        module = _action_module_cache[action_name]
         result = module.run(args)
-        return result if result else "Action completed."
-
+        return result or "Action completed."
     except Exception as e:
         return f"Action error: {e}"
-
-
-# =========================
-# Input (STT placeholder)
-# =========================
-def get_user_input():
-    return input("You: ").strip()
-
 
 # =========================
 # Output processing
 # =========================
-def process_output(output):
+def process_output(output: dict) -> str:
+    output_type = output.get("type")
+
+    # LLM returned a validated command directly — no need to regex parse
+    if output_type == "command":
+        return handle_action(output["command"])
+
+    # Plain chat response — strip any embedded JSON just in case
     message = output.get("message", "")
-
-    tool_json = None
-
-    # Try extracting JSON tool call
-    json_match = re.search(r"\{.*\}", message, re.DOTALL)
-    if json_match:
-        try:
-            tool_json = json.loads(json_match.group())
-        except json.JSONDecodeError:
-            tool_json = None
-
-    # Remove JSON from spoken text
-    speak_text = re.sub(r"\{.*\}", "", message, flags=re.DOTALL).strip()
-
-    # Execute tool if present
-    if tool_json:
-        speak_text = handle_action(tool_json)
-
-    if not speak_text:
-        speak_text = "Done."
-
-    return speak_text
-
+    speak_text = re.sub(r"\{.*?\}", "", message, flags=re.DOTALL).strip()
+    return speak_text or "Done."
 
 # =========================
 # Main loop
 # =========================
 def main_loop():
+    # Use a plain list; keep slot 0 for system prompt permanently
+    chat_history = [{"role": "system", "content": SYSTEM_PROMPT}]
+    MAX_TURNS = 20  # pairs kept after system prompt
+
     while True:
-        transcript = stt.speech_to_text(MODEL_PATH)
-        # transcript = get_user_input()
+        #transcript = stt.speech_to_text(MODEL_PATH)
+        transcript = input("You: ")  # ← uncomment (and comment line above) to use text input instead of STT
         if not transcript:
             continue
 
+        transcript = transcript.strip()
         if transcript.lower() in {"exit", "quit", "shutdown"}:
             break
 
@@ -112,21 +92,19 @@ def main_loop():
         chat_history.append({"role": "user", "content": transcript})
 
         output = llm.large_language_model(chat_history)
-
         speak_text = process_output(output)
+
         print(f"iva: {speak_text}")
 
-        # IMPORTANT: store RAW assistant output, not tool result
+        # Store RAW assistant message (not tool result) for context continuity
         chat_history.append({"role": "assistant", "content": output.get("message", "")})
 
-        # Speak
+        # Trim in-place: keep system prompt + last MAX_TURNS messages
+        if len(chat_history) > MAX_TURNS + 1:
+            del chat_history[1 : len(chat_history) - MAX_TURNS]
+
         mp3_audio = tts.tts_gtts_bytes(speak_text)
         play_mp3_bytes(mp3_audio)
-
-        # Keep last 20 turns (+ system)
-        if len(chat_history) > 21:
-            chat_history[:] = chat_history[:1] + chat_history[-20:]
-
 
 # =========================
 # Entry point

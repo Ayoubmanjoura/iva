@@ -1,5 +1,4 @@
 import subprocess
-import sys
 
 
 def play_mp3_bytes(mp3_bytes_io):
@@ -7,7 +6,4 @@ def play_mp3_bytes(mp3_bytes_io):
         ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", "-"],
         stdin=subprocess.PIPE,
     )
-
-    proc.stdin.write(mp3_bytes_io.read())
-    proc.stdin.close()
-    proc.wait()
+    proc.communicate(input=mp3_bytes_io.read())  # handles write + close + wait atomically
