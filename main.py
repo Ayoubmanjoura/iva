@@ -65,9 +65,10 @@ def process_output(output: dict) -> str:
     if output_type == "command":
         return handle_action(output["command"])
 
-    # Plain chat response — strip any embedded JSON just in case
+    # Plain chat response — strip <thinking> blocks (not spoken) and any embedded JSON
     message = output.get("message", "")
-    speak_text = re.sub(r"\{.*?\}", "", message, flags=re.DOTALL).strip()
+    speak_text = re.sub(r"<thinking>.*?</thinking>", "", message, flags=re.DOTALL)
+    speak_text = re.sub(r"\{.*?\}", "", speak_text, flags=re.DOTALL).strip()
     return speak_text or "Done."
 
 # =========================
@@ -79,7 +80,7 @@ def main_loop():
     MAX_TURNS = 20  # pairs kept after system prompt
 
     while True:
-        #transcript = stt.speech_to_text(MODEL_PATH)
+        # transcript = stt.speech_to_text(MODEL_PATH)
         transcript = input("You: ")  # ← uncomment (and comment line above) to use text input instead of STT
         if not transcript:
             continue

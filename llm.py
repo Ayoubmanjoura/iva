@@ -73,7 +73,7 @@ def large_language_model(messages: list) -> dict:
             "https://openrouter.ai/api/v1/chat/completions",
             headers={"Authorization": f"Bearer {API_KEY}"},
             json={
-                "model": "stepfun/step-3.5-flash:free",
+                "model": "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
                 "messages": messages,
                 "max_tokens": 512,
                 "temperature": 0.5,
