@@ -2,7 +2,7 @@
 Shared music player for all music actions.
 - Loads playlist metadata once at first play (no repeated yt-dlp calls)
 - Playback runs in a background thread so IVA stays responsive
-- Supports pause/resume via SIGSTOP/SIGCONT (Linux/Pi only)
+- Supports pause/resume via SIGSTOP/SIGCONT on the whole process group
 - Volume ducking via amixer for when IVA speaks
 """
 
@@ -17,12 +17,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 PLAYLIST_URL  = os.getenv("PLAYLIST_URL", "")
-ALSA_MIXER    = os.getenv("ALSA_MIXER", "Master")   # run `amixer scontrols` on Pi to find yours
-DUCK_VOLUME   = int(os.getenv("DUCK_VOLUME", "25"))  # % while IVA is speaking
+ALSA_MIXER    = os.getenv("ALSA_MIXER", "Master")
+DUCK_VOLUME   = int(os.getenv("DUCK_VOLUME", "25"))
 NORMAL_VOLUME = int(os.getenv("NORMAL_VOLUME", "85"))
 
 # ── internal state ────────────────────────────────────────────────────────────
-_tracks:   list[dict]              = []   # [{"title": str, "url": str}, ...]
+_tracks:   list[dict]              = []
 _index:    int                     = 0
 _proc:     subprocess.Popen | None = None
 _paused:   bool                    = False
@@ -34,14 +34,14 @@ _thread:   threading.Thread | None = None
 def _load_playlist() -> None:
     global _tracks
     if _tracks:
-        return  # already loaded
+        return
 
     print("[music] Fetching playlist metadata...")
     ydl_opts = {
-        "quiet":           True,
-        "extract_flat":    True,   # only metadata, no download
-        "skip_download":   True,
-        "ignoreerrors":    True,
+        "quiet":        True,
+        "extract_flat": True,
+        "skip_download": True,
+        "ignoreerrors": True,
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(PLAYLIST_URL, download=False)
@@ -57,7 +57,6 @@ def _load_playlist() -> None:
 
 # ── volume control ────────────────────────────────────────────────────────────
 def set_volume(pct: int) -> None:
-    """Set ALSA master volume to pct (0-100)."""
     try:
         subprocess.run(
             ["amixer", "sset", ALSA_MIXER, f"{pct}%"],
@@ -65,48 +64,41 @@ def set_volume(pct: int) -> None:
             stderr=subprocess.DEVNULL,
         )
     except FileNotFoundError:
-        pass  # amixer not available (dev machine) — silently skip
+        pass
 
 
 def duck() -> None:
-    """Lower volume so IVA can be heard over music."""
     set_volume(DUCK_VOLUME)
 
 
 def unduck() -> None:
-    """Restore normal volume after IVA finishes speaking."""
     set_volume(NORMAL_VOLUME)
 
 
 # ── playback ──────────────────────────────────────────────────────────────────
-def _stream(url: str) -> subprocess.Popen:
-    """Start ffplay streaming audio-only from a YouTube URL."""
-    stream_url = _get_stream_url(url)
-    return subprocess.Popen(
-        [
-            "ffplay", "-nodisp", "-autoexit",
-            "-loglevel", "quiet",
-            "-vn",          # no video
-            stream_url,
-        ],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-
-
 def _get_stream_url(url: str) -> str:
-    """Resolve a YouTube URL to a direct audio stream URL via yt-dlp."""
-    ydl_opts = {
-        "quiet":  True,
-        "format": "bestaudio/best",
-    }
+    ydl_opts = {"quiet": True, "format": "bestaudio/best"}
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
         return info["url"]
 
 
+def _stream(url: str) -> subprocess.Popen:
+    """
+    Launch ffplay in its own process group (start_new_session=True).
+    This means SIGSTOP/SIGCONT via os.killpg hits ffplay AND all its
+    child processes — so audio actually pauses.
+    """
+    stream_url = _get_stream_url(url)
+    return subprocess.Popen(
+        ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", "-vn", stream_url],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,  # own process group — key fix
+    )
+
+
 def _playback_loop(start_index: int) -> None:
-    """Background thread: plays tracks sequentially from start_index."""
     global _proc, _index, _paused
 
     i = start_index
@@ -121,11 +113,10 @@ def _playback_loop(start_index: int) -> None:
         with _lock:
             _proc = proc
 
-        proc.wait()  # block until song ends or process is killed
+        proc.wait()
 
         with _lock:
             if _proc is None:
-                # stop() was called — exit loop
                 break
 
         i += 1
@@ -137,9 +128,8 @@ def _playback_loop(start_index: int) -> None:
 
 def play(index: int = 0) -> None:
     global _thread
-    stop()  # kill any current playback first
+    stop()
     _load_playlist()
-
     _thread = threading.Thread(target=_playback_loop, args=(index,), daemon=True)
     _thread.start()
 
@@ -149,8 +139,9 @@ def stop() -> None:
     with _lock:
         if _proc is not None:
             try:
-                _proc.terminate()
-            except ProcessLookupError:
+                # Kill the whole process group
+                os.killpg(os.getpgid(_proc.pid), signal.SIGTERM)
+            except (ProcessLookupError, OSError):
                 pass
             _proc = None
         _paused = False
@@ -161,19 +152,24 @@ def pause_resume() -> str:
     with _lock:
         if _proc is None:
             return "Nothing is playing."
+        try:
+            pgid = os.getpgid(_proc.pid)
+        except OSError:
+            return "Nothing is playing."
+
         if not _paused:
             try:
-                os.kill(_proc.pid, signal.SIGSTOP)
+                os.killpg(pgid, signal.SIGSTOP)  # pause entire process group
                 _paused = True
                 return "Music paused."
-            except ProcessLookupError:
+            except OSError:
                 return "Nothing is playing."
         else:
             try:
-                os.kill(_proc.pid, signal.SIGCONT)
+                os.killpg(pgid, signal.SIGCONT)  # resume entire process group
                 _paused = False
                 return "Music resumed."
-            except ProcessLookupError:
+            except OSError:
                 return "Nothing is playing."
 
 
@@ -189,14 +185,12 @@ def get_tracks() -> list[dict]:
 
 
 def find_closest(query: str) -> int | None:
-    """Fuzzy match query against track titles. Returns index or None."""
     if not _tracks:
         return None
     titles = [t["title"].lower() for t in _tracks]
     matches = difflib.get_close_matches(query.lower(), titles, n=1, cutoff=0.3)
     if matches:
         return titles.index(matches[0])
-    # fallback: substring match
     for i, title in enumerate(titles):
         if query.lower() in title:
             return i
