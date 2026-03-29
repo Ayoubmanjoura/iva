@@ -63,7 +63,7 @@ def large_language_model(messages: list) -> dict:
             "https://openrouter.ai/api/v1/chat/completions",
             headers={"Authorization": f"Bearer {API_KEY}"},
             json={
-                "model": "arcee-ai/trinity-large-preview:free",
+                "model": "nvidia/nemotron-3-super-120b-a12b:free",
                 "messages": messages,
                 "max_tokens": 512,
                 "temperature": 0.5,

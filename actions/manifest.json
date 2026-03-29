@@ -89,5 +89,18 @@
   "pause_resume_music": {
     "description": "Pauses music if playing, resumes if paused.",
     "args": {}
+  },
+    "play_radio": {
+    "description": "Plays a radio station by name. Searches favorites first, then falls back to a global radio database of 30,000+ stations from any country.",
+    "args": {
+      "station": {
+        "type": "string",
+        "required": true
+      }
+    }
+  },
+  "stop_radio": {
+    "description": "Stops the currently playing radio station.",
+    "args": {}
   }
 }
