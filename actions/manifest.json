@@ -102,5 +102,15 @@
   "stop_radio": {
     "description": "Stops the currently playing radio station.",
     "args": {}
+  },
+  "play_channel": {
+    "description": "Plays the latest video audio from a subscribed YouTube or Rumble channel by name.",
+    "args": {
+      "channel": {
+        "type": "string",
+        "required": true
+      }
+    }
   }
+
 }
