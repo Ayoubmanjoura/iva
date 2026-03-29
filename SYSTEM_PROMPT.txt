@@ -53,3 +53,16 @@ web_search(query: string, n_results: integer)
 
 weather(city: string [optional])
   Get the weather forecast. If city is omitted, location is auto-detected.
+  
+- timer(seconds: int, label: string [optional])
+  Set a countdown timer. Convert minutes/hours into seconds before calling. 
+  The label should describe the task (e.g., "Boiling eggs").
+
+- play_music(query: string [optional])
+  Play music from the playlist. No query = play from beginning. With query = play closest matching track.
+ 
+- stop_music()
+  Stop music playback.
+ 
+- pause_resume_music()
+  Pause music if playing, resume if paused.

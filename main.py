@@ -5,6 +5,7 @@ import llm
 import stt
 import tts
 from audio import play_mp3_bytes
+from actions._music import duck, unduck
 
 # =========================
 # Paths
@@ -105,7 +106,9 @@ def main_loop():
             del chat_history[1 : len(chat_history) - MAX_TURNS]
 
         mp3_audio = tts.tts_gtts_bytes(speak_text)
+        duck()
         play_mp3_bytes(mp3_audio)
+        unduck()
 
 # =========================
 # Entry point

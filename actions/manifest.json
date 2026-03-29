@@ -66,5 +66,28 @@
         "required": false
       }
     }
+  },
+  "timer": {
+    "args": {
+        "seconds": {"type": "int", "required": true},
+        "label": {"type": "string", "required": false}
+    }
+  },
+    "play_music": {
+    "description": "Plays music from the configured playlist. If query is provided, plays the closest matching track. If omitted, plays the full playlist from the beginning.",
+    "args": {
+      "query": {
+        "type": "string",
+        "required": false
+      }
+    }
+  },
+  "stop_music": {
+    "description": "Stops music playback.",
+    "args": {}
+  },
+  "pause_resume_music": {
+    "description": "Pauses music if playing, resumes if paused.",
+    "args": {}
   }
 }

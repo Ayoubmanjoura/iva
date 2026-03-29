@@ -7,7 +7,7 @@ from web_search.url import list_url
 load_dotenv()
 API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-MODEL = "cognitivecomputations/dolphin-mistral-24b-venice-edition:free"
+MODEL = "arcee-ai/trinity-large-preview:free"
 
 HEADERS = {
     "User-Agent": (
